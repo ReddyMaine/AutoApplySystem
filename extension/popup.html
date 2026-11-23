@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>AutoApply AI Copiloto</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="header">
+      <div class="brand">
+        <span class="mark">⚡</span>
+        <span>autoapply<span class="accent">.ai</span></span>
+      </div>
+      <div class="header-actions">
+        <a id="open-dashboard" class="link-btn" href="http://localhost:3000" target="_blank">Painel ↗</a>
+        <button id="logout-btn" class="link-btn hidden" type="button">Sair</button>
+      </div>
+    </header>
+
+    <div id="alert" class="alert hidden"></div>
+
+    <!-- Tela de Login -->
+    <section id="login-view" class="panel hidden">
+      <h2>Conectar ao AutoApply</h2>
+      <p class="muted">Use o mesmo e-mail e senha da sua conta local em localhost:3000.</p>
+      <form id="login-form">
+        <label>
+          URL da API
+          <input id="api-base" type="url" value="http://localhost:8000" required />
+        </label>
+        <label>
+          E-mail
+          <input id="email" type="email" placeholder="voce@exemplo.com" required />
+        </label>
+        <label>
+          Senha
+          <input id="password" type="password" placeholder="Sua senha" required />
+        </label>
+        <button id="login-submit" class="btn primary full" type="submit">Conectar</button>
+      </form>
+    </section>
+
+    <!-- Tela Principal -->
+    <main id="app-view" class="hidden">
+      <section class="card">
+        <div class="card-top">
+          <span class="eyebrow">PÁGINA ATUAL</span>
+          <span id="match-badge" class="badge hidden"></span>
+        </div>
+        <strong id="page-title" class="page-title">Lendo página...</strong>
+        <span id="page-company" class="muted small"></span>
+        <div id="resume-status" class="resume-pill"></div>
+      </section>
+
+      <section class="actions">
+        <button id="fill-btn" class="btn primary full" type="button">
+          ⚡ Preencher formulário agora
+        </button>
+        <button id="import-btn" class="btn secondary full" type="button">
+          + Importar vaga e preparar com IA
+        </button>
+      </section>
+
+      <!-- Seção de candidatura vinculada -->
+      <section id="linked-box" class="card hidden">
+        <div class="card-top">
+          <span class="eyebrow">CANDIDATURA VINCULADA</span>
+          <span id="app-status-badge" class="badge"></span>
+        </div>
+
+        <div class="ai-question-box">
+          <label class="small-label">Pergunta extra encontrada no formulário?</label>
+          <div class="inline-row">
+            <input id="custom-question" placeholder="Ex.: Por que quer mudar de emprego?" />
+            <button id="ask-ai-btn" class="btn secondary sm" type="button">IA</button>
+          </div>
+          <div id="ai-answer-preview" class="answer-box hidden">
+            <p id="ai-answer-text"></p>
+            <div class="inline-row">
+              <button id="copy-ai-btn" class="btn ghost sm" type="button">Copiar</button>
+              <button id="insert-ai-btn" class="btn primary sm" type="button">Inserir no campo</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="mark-sent-box" class="mark-sent hidden">
+          <label class="small-label">Já enviou no site da empresa?</label>
+          <div class="inline-row">
+            <input id="receipt-input" placeholder="Protocolo ou confirmação (opcional)" />
+            <button id="mark-sent-btn" class="btn primary sm" type="button">✓ Enviei</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Cópia rápida -->
+      <section class="card">
+        <span class="eyebrow">CÓPIA RÁPIDA (1 CLIQUE)</span>
+        <div id="copy-chips" class="chips"></div>
+      </section>
+
+      <footer class="foot">
+        Você sempre revisa, resolve CAPTCHAs e clica em Enviar no portal oficial.
+      </footer>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
