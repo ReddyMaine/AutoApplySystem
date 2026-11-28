@@ -42,12 +42,14 @@ def delete_account(response: Response, db: Session = Depends(get_db),
     # Fail closed if checkpoints cannot be purged. Durable agent state can
     # contain personal data; deleting SQL rows alone would leave it behind.
     app_ids = [str(a) for a in db.scalars(select(Application.id).where(Application.user_id == user.id))]
-    try:
-        with PostgresSaver.from_conn_string(get_settings().checkpoint_dsn) as saver:
-            for app_id in app_ids:
-                saver.delete_thread(app_id)
-    except Exception:
-        raise HTTPException(503, "Não foi possível excluir os checkpoints; tente novamente")
+    if app_ids:
+        try:
+            with PostgresSaver.from_conn_string(get_settings().checkpoint_dsn) as saver:
+                saver.setup()
+                for app_id in app_ids:
+                    saver.delete_thread(app_id)
+        except Exception:
+            raise HTTPException(503, "Não foi possível excluir os checkpoints; tente novamente")
     # DB FK CASCADE removes user-owned rows; jobs remain shared.
     folder = Path(get_settings().storage_dir) / str(user.id)
     db.execute(delete(User).where(User.id == user.id))

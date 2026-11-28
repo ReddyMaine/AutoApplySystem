@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: autoapply
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-autoapply_dev_only}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -20,7 +20,7 @@ services:
     image: redis:7-alpine
     command: redis-server --appendonly yes
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -37,9 +37,14 @@ services:
       JWT_SECRET: ${JWT_SECRET:-development_change_this_secret_before_publication}
       STORAGE_DIR: /data/resumes
       SECURE_COOKIES: "false"
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_CHAT_MODEL: ${GEMINI_CHAT_MODEL:-gemini-3.8-flash}
+      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-001}
+      GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai/}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-gpt-4.1-mini}
-      OPENAI_EMBEDDING_MODEL: text-embedding-3-small
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
       GREENHOUSE_BOARDS: ${GREENHOUSE_BOARDS:-}
       LEVER_SITES: ${LEVER_SITES:-}
       ASHBY_BOARDS: ${ASHBY_BOARDS:-}

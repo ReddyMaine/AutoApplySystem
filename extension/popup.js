@@ -42,15 +42,61 @@ async function api(path, opts = {}) {
   return res.data;
 }
 
-async function ensureContentScript(tabId) {
+async function ensureContentScript(tabId, allFrames = false) {
   await chrome.scripting.executeScript({
-    target: { tabId },
+    target: { tabId, allFrames },
     files: ["content.js"],
   });
 }
 
+async function runInFrames(tabId, action, payload = null, allFrames = true) {
+  await ensureContentScript(tabId, allFrames);
+  const results = await chrome.scripting.executeScript({
+    target: { tabId, allFrames },
+    func: (act, data) => {
+      try {
+        return window.__AUTOAPPLY_COPILOT_API__?.[act]?.(data) ?? null;
+      } catch {
+        return null;
+      }
+    },
+    args: [action, payload],
+  });
+  return (results || []).map((r) => r.result).filter(Boolean);
+}
+
 async function sendToTab(tabId, message) {
-  await ensureContentScript(tabId);
+  if (message.type === "EXTRACT_JOB") {
+    const res = await runInFrames(tabId, "extractJob", null, false);
+    return { ok: true, job: res[0] || null };
+  }
+  if (message.type === "FILL_FORM") {
+    const frameResults = await runInFrames(tabId, "fillForm", message.payload || {}, true);
+    const mergedFields = [];
+    let filledCount = 0;
+    let skippedCount = 0;
+    let resumeAttached = false;
+    for (const r of frameResults) {
+      filledCount += r.filledCount || 0;
+      skippedCount += r.skippedCount || 0;
+      if (r.resumeAttached) resumeAttached = true;
+      for (const f of r.filledFields || []) {
+        if (!mergedFields.includes(f)) mergedFields.push(f);
+      }
+    }
+    const toastMsg =
+      filledCount > 0
+        ? `AutoApply preencheu ${filledCount} campo(s): ${mergedFields.slice(0, 7).join(", ")}. Revise antes de enviar.`
+        : "Nenhum campo vazio reconhecido nesta página. Role até o formulário ou use a cópia rápida.";
+    await runInFrames(tabId, "showToast", toastMsg, false).catch(() => {});
+    return { ok: true, result: { filledCount, filledFields: mergedFields, resumeAttached, skippedCount } };
+  }
+  if (message.type === "INSERT_TEXT") {
+    const frameResults = await runInFrames(tabId, "insertText", message.text || "", true);
+    const inserted = frameResults.some((r) => r.inserted);
+    return { ok: true, result: { inserted } };
+  }
+  await ensureContentScript(tabId, false);
   return new Promise((resolve, reject) => {
     chrome.tabs.sendMessage(tabId, message, (resp) => {
       if (chrome.runtime.lastError) {

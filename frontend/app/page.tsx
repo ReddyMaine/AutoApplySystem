@@ -167,8 +167,20 @@ export default function Home() {
   }
 
   async function logout() {
-    await run("logout", () => api("/auth/logout", { method: "POST" }), "Sessão encerrada");
-    setSession(null);
+    setBusy("logout");
+    setNotice("");
+    setError("");
+    try {
+      await api("/auth/logout", { method: "POST" });
+      setSession(null);
+      setSelected(null);
+      setPrepareJob(null);
+      setImportOpen(false);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy("");
+    }
   }
 
   async function exportAccount() {

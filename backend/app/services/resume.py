@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 import fitz
 from docx import Document
-from app.config import get_settings
+from app.services.llm import get_llm_client
 
 SKILLS = ["Python", "FastAPI", "Django", "Flask", "PostgreSQL", "MySQL", "Redis", "Docker", "Kubernetes", "AWS", "Azure", "GCP", "React", "TypeScript", "JavaScript", "LangChain", "LangGraph", "RAG", "SQL", "Git", "CI/CD", "Terraform", "Java", "Spring Boot", "Go", "Node.js", "Machine Learning", "PyTorch", "Pandas", "Airflow"]
 
@@ -31,17 +31,27 @@ def rule_based_extract(text: str) -> dict:
             "requires_review": True}
 
 
+def _parse_json_object(raw: str) -> dict:
+    cleaned = (raw or "").strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+    try:
+        parsed = json.loads(cleaned or "{}")
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
 def extract_resume(text: str) -> dict:
     if not text.strip():
         raise ValueError("Currículo sem texto selecionável; OCR ainda não está habilitado")
     base = rule_based_extract(text)
-    settings = get_settings()
-    if not settings.openai_api_key:
+    client, cfg = get_llm_client(timeout=35)
+    if not client or not cfg:
         return base
-    from openai import OpenAI
-    client = OpenAI(api_key=settings.openai_api_key, timeout=35)
     response = client.chat.completions.create(
-        model=settings.openai_chat_model,
+        model=cfg["chat_model"],
         temperature=0,
         response_format={"type": "json_object"},
         messages=[
@@ -49,12 +59,12 @@ def extract_resume(text: str) -> dict:
             {"role": "user", "content": text[:25000]},
         ],
     )
-    parsed = json.loads(response.choices[0].message.content or "{}")
-    if not isinstance(parsed, dict):
+    parsed = _parse_json_object(response.choices[0].message.content or "{}")
+    if not parsed:
         return base
     allowed = {"name", "title", "summary", "skills", "experiences", "education", "certifications", "location"}
     clean = {k: parsed[k] for k in allowed if k in parsed}
-    clean["extraction_method"] = "llm"
+    clean["extraction_method"] = f"llm:{cfg['provider']}"
     clean["requires_review"] = True
     clean["contact_email"] = base.get("contact_email")
     return clean

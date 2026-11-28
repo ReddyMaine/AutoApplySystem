@@ -12,6 +12,7 @@ from app.database import Base, SessionLocal, engine, get_db
 from app.models import User, Application
 from app.security import current_user
 from app.connectors.discovery import demo_jobs
+from app.services.llm import get_llm_config
 from app.tasks import save_jobs
 from app.routers import auth, profiles, resumes, jobs, applications, sandbox, privacy
 
@@ -88,7 +89,12 @@ app.include_router(privacy.router)
 def health():
     with engine.connect() as conn:
         conn.execute(text("SELECT 1"))
-    return {"status": "ok", "service": "autoapply-api"}
+    cfg = get_llm_config()
+    return {
+        "status": "ok",
+        "service": "autoapply-api",
+        "llm_provider": cfg["provider"] if cfg else "heuristic",
+    }
 
 
 @app.get("/api/v1/metrics")

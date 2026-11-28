@@ -1,7 +1,7 @@
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
-from app.config import get_settings
 from app.models import ProfileFact, Profile
+from app.services.llm import get_llm_client, llm_configured, normalize_vector
 from app.services.matching import tokens
 
 
@@ -33,15 +33,18 @@ def text_facts(profile: dict) -> list[tuple[str, str]]:
 
 
 def embed(text: str) -> list[float] | None:
-    settings = get_settings()
-    if not settings.openai_api_key:
+    client, cfg = get_llm_client(timeout=30)
+    if not client or not cfg:
         return None
-    from openai import OpenAI
-    client = OpenAI(api_key=settings.openai_api_key, timeout=30)
-    out = client.embeddings.create(model=settings.openai_embedding_model, input=text[:8000])
+    params = {"model": cfg["embedding_model"], "input": text[:8000]}
+    if cfg["provider"] == "gemini" or cfg["embedding_model"].startswith(("text-embedding-3", "gemini-embedding")):
+        params["dimensions"] = 1536
+    out = client.embeddings.create(**params)
     vector = out.data[0].embedding
     if len(vector) != 1536:
         raise ValueError("O modelo de embedding precisa retornar 1536 dimensões")
+    if cfg["provider"] == "gemini":
+        vector = normalize_vector(vector)
     return vector
 
 
@@ -73,7 +76,7 @@ def retrieve_evidence(db: Session, user_id, question: str, limit: int = 5) -> li
                 {"id": f"live-profile-{i}", "kind": kind, "content": content}
                 for i, (kind, content) in ranked[:limit]
             ]
-    vector = embed(question) if facts and get_settings().openai_api_key else None
+    vector = embed(question) if facts and llm_configured() else None
     if vector is not None and any(f.embedding is not None for f in facts):
         rows = db.scalars(
             select(ProfileFact)
@@ -96,21 +99,19 @@ def answer_question(question: str, job: dict, evidence: list[dict]) -> dict:
             "requires_review": True,
             "warning": "Perfil sem informações suficientes",
         }
-    settings = get_settings()
+    client, cfg = get_llm_client(timeout=35)
     supporting = "\n".join("[" + e["id"] + "] " + e["content"] for e in evidence)
-    if not settings.openai_api_key:
+    if not client or not cfg:
         short = evidence[:2]
         return {
             "question": question,
             "answer": "Com base no meu perfil: " + ". ".join(e["content"][:220] for e in short) + ".",
             "evidence_ids": [e["id"] for e in short],
             "requires_review": True,
-            "warning": "Rascunho heurístico: configure OPENAI_API_KEY para geração contextual.",
+            "warning": "Rascunho heurístico: configure GEMINI_API_KEY ou OPENAI_API_KEY para geração contextual.",
         }
-    from openai import OpenAI
-    client = OpenAI(api_key=settings.openai_api_key, timeout=35)
     response = client.chat.completions.create(
-        model=settings.openai_chat_model,
+        model=cfg["chat_model"],
         temperature=0.2,
         messages=[
             {
@@ -152,13 +153,11 @@ def generate_cover_letter(profile: dict, job: dict, evidence: list[dict]) -> str
     job_title = str(job.get("title") or "a oportunidade").strip()
     company = str(job.get("company") or "sua equipe").strip()
 
-    settings = get_settings()
-    if settings.openai_api_key and evidence:
-        from openai import OpenAI
+    client, cfg = get_llm_client(timeout=35)
+    if client and cfg and evidence:
         supporting = "\n".join("[" + e["id"] + "] " + e["content"] for e in evidence)
-        client = OpenAI(api_key=settings.openai_api_key, timeout=35)
         response = client.chat.completions.create(
-            model=settings.openai_chat_model,
+            model=cfg["chat_model"],
             temperature=0.25,
             messages=[
                 {

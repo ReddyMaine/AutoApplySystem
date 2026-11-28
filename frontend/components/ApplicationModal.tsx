@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   Camera,
   Check,
@@ -72,15 +72,81 @@ export function ApplicationModal({
   const [pending, setPending] = useState("");
   const [localError, setLocalError] = useState("");
 
+  const lastSyncedRef = useRef({
+    id: item.id,
+    status: item.status,
+    updatedAt: item.updated_at ?? "",
+    answersLen: item.answers.length,
+    stage: item.stage || "none",
+    receipt: item.external_receipt || "",
+    notes: item.notes || "",
+    followUp: item.follow_up_at ? item.follow_up_at.slice(0, 10) : "",
+  });
+
   useEffect(() => {
-    setAnswers(item.answers.map((a) => ({ ...a })));
-    setCoverLetter(item.cover_letter || "");
-    setStage(item.stage || "none");
-    setReceipt(item.external_receipt || "");
-    setManualReceipt(item.external_receipt || "");
-    setNotes(item.notes || "");
-    setManualNotes(item.notes || "");
-    setFollowUp(item.follow_up_at ? item.follow_up_at.slice(0, 10) : "");
+    const prev = lastSyncedRef.current;
+    const nextUpdatedAt = item.updated_at ?? "";
+    const nextStage = item.stage || "none";
+    const nextReceipt = item.external_receipt || "";
+    const nextNotes = item.notes || "";
+    const nextFollowUp = item.follow_up_at ? item.follow_up_at.slice(0, 10) : "";
+
+    const isDifferentItem = prev.id !== item.id;
+    const statusChanged = prev.status !== item.status;
+    const answersChanged = prev.answersLen !== item.answers.length;
+    const serverUpdated =
+      prev.updatedAt !== nextUpdatedAt ||
+      prev.stage !== nextStage ||
+      prev.receipt !== nextReceipt ||
+      prev.notes !== nextNotes ||
+      prev.followUp !== nextFollowUp;
+
+    if (!isDifferentItem && !statusChanged && !answersChanged && !serverUpdated) {
+      return;
+    }
+
+    if (isDifferentItem) {
+      setTab(initialTab(item.status));
+      setAnswers(item.answers.map((a) => ({ ...a })));
+      setCoverLetter(item.cover_letter || "");
+    } else if (statusChanged) {
+      setAnswers(item.answers.map((a) => ({ ...a })));
+      setCoverLetter(item.cover_letter || "");
+    } else if (answersChanged) {
+      setAnswers((current) =>
+        item.answers.map((serverAns, idx) =>
+          idx < current.length && current[idx].question === serverAns.question
+            ? current[idx]
+            : { ...serverAns }
+        )
+      );
+    }
+
+    if (isDifferentItem || statusChanged || prev.stage !== nextStage) {
+      setStage(nextStage);
+    }
+    if (isDifferentItem || statusChanged || prev.receipt !== nextReceipt) {
+      setReceipt(nextReceipt);
+      setManualReceipt(nextReceipt);
+    }
+    if (isDifferentItem || statusChanged || prev.notes !== nextNotes) {
+      setNotes(nextNotes);
+      setManualNotes(nextNotes);
+    }
+    if (isDifferentItem || statusChanged || prev.followUp !== nextFollowUp) {
+      setFollowUp(nextFollowUp);
+    }
+
+    lastSyncedRef.current = {
+      id: item.id,
+      status: item.status,
+      updatedAt: nextUpdatedAt,
+      answersLen: item.answers.length,
+      stage: nextStage,
+      receipt: nextReceipt,
+      notes: nextNotes,
+      followUp: nextFollowUp,
+    };
   }, [item]);
 
   const loadEvents = useCallback(async () => {

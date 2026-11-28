@@ -16,5 +16,5 @@ Extensão Manifest V3 que conecta o seu navegador (Chrome, Edge ou Brave) ao seu
 2. Abra `chrome://extensions` (ou `edge://extensions`).
 3. Ative **Modo do desenvolvedor** (canto superior direito).
 4. Clique em **Carregar sem compactação** (*Load unpacked*).
-5. Selecione a pasta `extension` dentro deste projeto (`c:\Users\Tuti\Documents\AutoApplySystem\extension`).
+5. Selecione a pasta `extension` dentro deste projeto (`c:\Users\Junior\Documents\GitHub\AutoApplySystem\extension`).
 6. Fixe o ícone **AutoApply AI Copiloto** na barra do navegador, clique nele e faça login com o e-mail e senha da sua conta local.
